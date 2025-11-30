@@ -95,7 +95,6 @@ export const createBookingAction = createAction<{
     timeSlot: string;
     patientId?: number;
     symptoms?: string;
-    fee?: number;
   };
 }>(`${SLICE_NAME}/createBookingRequest`);
 

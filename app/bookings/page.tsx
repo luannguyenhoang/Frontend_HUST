@@ -225,12 +225,6 @@ export default function BookingsPage() {
                   </div>
                 </div>
                 <div>
-                  <div className="text-sm text-gray-500">Phí khám</div>
-                  <div className="font-semibold">
-                    {selectedBooking.fee?.toLocaleString("vi-VN")} VNĐ
-                  </div>
-                </div>
-                <div>
                   <div className="text-sm text-gray-500">Trạng thái</div>
                   <Tag color={getStatusColor(selectedBooking.status)}>
                     {getStatusText(selectedBooking.status)}
