@@ -7,12 +7,14 @@ export type SpecialtyState = {
   readonly specialties: Specialty[];
   readonly currentSpecialty: Specialty | null;
   readonly isPending: boolean;
+  readonly pagination: { total: number; page: number; pageSize: number; totalPages: number } | null;
 };
 
 const initialState: SpecialtyState = {
   specialties: [],
   currentSpecialty: null,
   isPending: false,
+  pagination: null,
 };
 
 const SLICE_NAME = "specialty";
@@ -21,9 +23,10 @@ const specialtySlice = createSlice({
   name: SLICE_NAME,
   initialState,
   reducers: {
-    fetchSpecialtiesSuccess: (state, action: PayloadAction<Specialty[]>) => ({
+    fetchSpecialtiesSuccess: (state, action: PayloadAction<{ specialties: Specialty[]; pagination?: any }>) => ({
       ...state,
-      specialties: action.payload,
+      specialties: action.payload.specialties,
+      pagination: action.payload.pagination || null,
       isPending: false,
     }),
     fetchSpecialtiesFailure: (state) => ({
@@ -65,7 +68,7 @@ export const {
 
 export default specialtySlice.reducer;
 
-export const fetchSpecialtiesAction = createAction<{ search?: string }>(
+export const fetchSpecialtiesAction = createAction<{ search?: string; page?: number; pageSize?: number }>(
   `${SLICE_NAME}/fetchSpecialtiesRequest`
 );
 
@@ -95,12 +98,16 @@ export const updateSpecialtyAction = createAction<{
 function* handleFetchSpecialties(): Generator<any, void, any> {
   while (true) {
     const {
-      payload: { search },
+      payload: { search, page, pageSize },
     }: ReturnType<typeof fetchSpecialtiesAction> = yield take(fetchSpecialtiesAction);
     try {
       yield put(updatePending());
-      const specialties = yield call(getAllSpecialties, search);
-      yield put(fetchSpecialtiesSuccess(specialties));
+      const result = yield call(getAllSpecialties, search, page, pageSize);
+      if (Array.isArray(result)) {
+        yield put(fetchSpecialtiesSuccess({ specialties: result, pagination: null }));
+      } else {
+        yield put(fetchSpecialtiesSuccess({ specialties: result.data, pagination: result.pagination }));
+      }
     } catch (e: any) {
       yield put(fetchSpecialtiesFailure());
       throw e;

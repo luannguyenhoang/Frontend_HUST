@@ -10,7 +10,7 @@ import {
   fetchFamilyMembersAction,
 } from "@/redux/modules";
 import { createBookingAction } from "@/redux/modules/booking";
-import { Card, Form, Select, Button, Input, message } from "antd";
+import { Card, Form, Select, Button, Input, message, Pagination } from "antd";
 import { ArrowLeftOutlined, SearchOutlined, UserOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 import { useRouter } from "next/navigation";
@@ -38,8 +38,8 @@ interface GroupedSlot {
 export default function BookingPage() {
   const [form] = Form.useForm();
   const dispatch = useAppDispatch();
-  const { specialties } = useAppSelector((state) => state.specialty);
-  const { doctors } = useAppSelector((state) => state.doctor);
+  const { specialties, pagination: specialtyPagination } = useAppSelector((state) => state.specialty);
+  const { doctors, pagination: doctorPagination } = useAppSelector((state) => state.doctor);
   const { availableSlots } = useAppSelector((state) => state.appointment);
   const { currentUser } = useAppSelector((state) => state.auth);
   const { familyMembers } = useAppSelector((state) => state.familyMember);
@@ -56,6 +56,10 @@ export default function BookingPage() {
   const [selectedAppointmentId, setSelectedAppointmentId] = useState<number | null>(null);
   const [searchKeyword, setSearchKeyword] = useState<string>("");
   const [selectedSpecialtyId, setSelectedSpecialtyId] = useState<number | null>(null);
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [pageSize] = useState<number>(10);
+  const [currentDoctorPage, setCurrentDoctorPage] = useState<number>(1);
+  const [doctorPageSize] = useState<number>(10);
 
   const [bookingMode, setBookingMode] = useState<"select" | "specialty" | "doctor">("select");
   const [selectedDoctorFromList, setSelectedDoctorFromList] = useState<number | null>(null);
@@ -66,12 +70,21 @@ export default function BookingPage() {
       router.push("/login");
       return;
     }
-    dispatch(fetchSpecialtiesAction({}));
-    dispatch(fetchDoctorsAction({}));
     dispatch(fetchFamilyMembersAction());
-    // Mặc định chọn chính user
     setSelectedPatientId(null);
   }, [dispatch, currentUser, router]);
+
+  useEffect(() => {
+    if (currentUser) {
+      dispatch(fetchSpecialtiesAction({ search: searchKeyword || undefined, page: currentPage, pageSize }));
+    }
+  }, [dispatch, searchKeyword, currentPage, pageSize, currentUser]);
+
+  useEffect(() => {
+    if (currentUser) {
+      dispatch(fetchDoctorsAction({ page: currentDoctorPage, pageSize: doctorPageSize }));
+    }
+  }, [dispatch, currentDoctorPage, doctorPageSize, currentUser]);
 
   const dates = useMemo(() => {
     const datesList = [];
@@ -130,24 +143,25 @@ export default function BookingPage() {
     return result;
   }, [availableSlots]);
 
-  const filteredSpecialties = useMemo(() => {
-    if (!searchKeyword) return specialties;
-    const keyword = searchKeyword.toLowerCase();
-    return specialties.filter(
-      (s) =>
-        s.name.toLowerCase().includes(keyword) ||
-        (s.description && s.description.toLowerCase().includes(keyword)) ||
-        (s.symptoms && s.symptoms.some((sym) => sym.toLowerCase().includes(keyword)))
-    );
-  }, [specialties, searchKeyword]);
 
   const handleSpecialtySelect = (specialtyId: number) => {
     setSelectedSpecialtyId(specialtyId);
     form.setFieldsValue({ specialtyId });
-    dispatch(fetchDoctorsAction({ specialtyId }));
+    dispatch(fetchDoctorsAction({ specialtyId, page: 1, pageSize: doctorPageSize }));
     form.setFieldsValue({ doctorId: undefined, title: undefined });
     setSelectedDoctorId(undefined);
     setSearchKeyword("");
+    setCurrentPage(1);
+  };
+
+  const handleSpecialtyPageChange = (page: number) => {
+    setCurrentPage(page);
+    dispatch(fetchSpecialtiesAction({ search: searchKeyword || undefined, page, pageSize }));
+  };
+
+  const handleDoctorPageChange = (page: number) => {
+    setCurrentDoctorPage(page);
+    dispatch(fetchDoctorsAction({ page, pageSize: doctorPageSize }));
   };
 
   const handleDateSelect = (date: string) => {
@@ -276,7 +290,7 @@ export default function BookingPage() {
             {/* Danh sách bác sĩ */}
             <div className="mb-4">
               <h2 className="text-lg font-semibold mb-4">Bác sĩ khám trong tuần</h2>
-              <div className="space-y-4 max-h-96 overflow-y-auto">
+              <div className="space-y-4 mb-4">
                 {doctors.map((doctor) => {
                   const specialty = specialties.find((s) => s.id === doctor.specialtyId);
                   return (
@@ -326,6 +340,19 @@ export default function BookingPage() {
                   );
                 })}
               </div>
+              {doctorPagination && doctorPagination.total > doctorPageSize && (
+                <div className="flex justify-center mt-4">
+                  <Pagination
+                    current={currentDoctorPage}
+                    total={doctorPagination.total}
+                    pageSize={doctorPageSize}
+                    onChange={handleDoctorPageChange}
+                    showSizeChanger={false}
+                    showQuickJumper={false}
+                    showTotal={(total, range) => `${range[0]}-${range[1]} của ${total} bác sĩ`}
+                  />
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -422,7 +449,7 @@ export default function BookingPage() {
               {/* Chọn chuyên khoa */}
               {!selectedSpecialtyId && (
                 <div className="mb-6">
-                  <h2 className="text-xl font-bold mb-4">Chọn theo chuyên khoa</h2>
+                  <h2 className="text-xl font-bold mb-4 ">Chọn theo chuyên khoa</h2>
                   <Form.Item
                     name="specialtyId"
                     rules={[{ required: true, message: "Vui lòng chọn chuyên khoa" }]}
@@ -433,22 +460,26 @@ export default function BookingPage() {
                         placeholder="Tìm kiếm chuyên khoa..."
                         prefix={<SearchOutlined className="text-gray-400" />}
                         value={searchKeyword}
-                        onChange={(e) => setSearchKeyword(e.target.value)}
+                        onChange={(e) => {
+                          setSearchKeyword(e.target.value);
+                          setCurrentPage(1);
+                          dispatch(fetchSpecialtiesAction({ search: e.target.value || undefined, page: 1, pageSize }));
+                        }}
                         className="mb-4"
                       />
-                      <div className="max-h-96 overflow-y-auto space-y-3">
-                        {filteredSpecialties.length === 0 ? (
+                      <div className="space-y-3 mb-4">
+                        {specialties.length === 0 ? (
                           <div className="p-4 text-center text-gray-500">
                             Không tìm thấy chuyên khoa nào
                           </div>
                         ) : (
-                          filteredSpecialties.map((specialty) => (
+                          specialties.map((specialty) => (
                             <div
                               key={specialty.id}
                               onClick={() => handleSpecialtySelect(specialty.id)}
                               className="bg-green-600 text-white p-4 rounded-lg cursor-pointer transition-all hover:bg-green-700"
                             >
-                              <div className="font-semibold text-lg mb-2 text-black">
+                              <div className="font-semibold text-lg mb-2 text-white">
                                 {specialty.name}
                               </div>
                               {specialty.symptoms && specialty.symptoms.length > 0 && (
@@ -470,6 +501,19 @@ export default function BookingPage() {
                           ))
                         )}
                       </div>
+                      {specialtyPagination && specialtyPagination.total > pageSize && (
+                        <div className="flex justify-center mt-4">
+                          <Pagination
+                            current={currentPage}
+                            total={specialtyPagination.total}
+                            pageSize={pageSize}
+                            onChange={handleSpecialtyPageChange}
+                            showSizeChanger={false}
+                            showQuickJumper={false}
+                            showTotal={(total, range) => `${range[0]}-${range[1]} của ${total} chuyên khoa`}
+                          />
+                        </div>
+                      )}
                     </div>
                   </Form.Item>
                 </div>

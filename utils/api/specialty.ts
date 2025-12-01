@@ -12,11 +12,37 @@ export interface Specialty {
   updatedAt: string;
 }
 
-export const getAllSpecialties = (search?: string): Promise<Specialty[]> => {
-  const params = search ? { search } : {};
+export interface PaginationResponse<T> {
+  data: T[];
+  pagination: {
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
+export const getAllSpecialties = (
+  search?: string,
+  page?: number,
+  pageSize?: number
+): Promise<Specialty[] | PaginationResponse<Specialty>> => {
+  const params: any = {};
+  if (search) params.search = search;
+  if (page !== undefined) params.page = page;
+  if (pageSize !== undefined) params.pageSize = pageSize;
+  
   return api
     .get("/specialties", { params })
-    .then((res: AxiosResponse<{ success: boolean; data: Specialty[] }>) => res.data.data);
+    .then((res: AxiosResponse<{ success: boolean; data: Specialty[]; pagination?: any }>) => {
+      if (res.data.pagination) {
+        return {
+          data: res.data.data,
+          pagination: res.data.pagination
+        } as PaginationResponse<Specialty>;
+      }
+      return res.data.data;
+    });
 };
 
 export const getSpecialtyById = (id: number): Promise<Specialty> => {

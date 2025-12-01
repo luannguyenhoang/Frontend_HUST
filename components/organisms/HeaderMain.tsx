@@ -46,7 +46,7 @@ export default function HeaderMain() {
       <div className="container mx-auto px-4 py-4">
         <div className="flex items-center justify-between">
           <Link href="/home" className="text-2xl font-bold text-primary">
-            Bệnh viện Bạch Mai
+            Đại Học Bách Khóa
           </Link>
 
           <nav className="flex items-center gap-6">

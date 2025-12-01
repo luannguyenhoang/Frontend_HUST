@@ -13,14 +13,31 @@ export interface Doctor {
   updatedAt: string;
 }
 
-export const getAllDoctors = (specialtyId?: number, search?: string): Promise<Doctor[]> => {
+import { PaginationResponse } from "./specialty";
+
+export const getAllDoctors = (
+  specialtyId?: number,
+  search?: string,
+  page?: number,
+  pageSize?: number
+): Promise<Doctor[] | PaginationResponse<Doctor>> => {
   const params: any = {};
   if (specialtyId) params.specialtyId = specialtyId;
   if (search) params.search = search;
+  if (page !== undefined) params.page = page;
+  if (pageSize !== undefined) params.pageSize = pageSize;
   
   return api
     .get("/doctors", { params })
-    .then((res: AxiosResponse<{ success: boolean; data: Doctor[] }>) => res.data.data);
+    .then((res: AxiosResponse<{ success: boolean; data: Doctor[]; pagination?: any }>) => {
+      if (res.data.pagination) {
+        return {
+          data: res.data.data,
+          pagination: res.data.pagination
+        } as PaginationResponse<Doctor>;
+      }
+      return res.data.data;
+    });
 };
 
 export const getDoctorById = (id: number): Promise<Doctor> => {

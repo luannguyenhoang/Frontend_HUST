@@ -7,12 +7,14 @@ export type DoctorState = {
   readonly doctors: Doctor[];
   readonly currentDoctor: Doctor | null;
   readonly isPending: boolean;
+  readonly pagination: { total: number; page: number; pageSize: number; totalPages: number } | null;
 };
 
 const initialState: DoctorState = {
   doctors: [],
   currentDoctor: null,
   isPending: false,
+  pagination: null,
 };
 
 const SLICE_NAME = "doctor";
@@ -21,9 +23,10 @@ const doctorSlice = createSlice({
   name: SLICE_NAME,
   initialState,
   reducers: {
-    fetchDoctorsSuccess: (state, action: PayloadAction<Doctor[]>) => ({
+    fetchDoctorsSuccess: (state, action: PayloadAction<{ doctors: Doctor[]; pagination?: any }>) => ({
       ...state,
-      doctors: action.payload,
+      doctors: action.payload.doctors,
+      pagination: action.payload.pagination || null,
       isPending: false,
     }),
     fetchDoctorsFailure: (state) => ({
@@ -69,7 +72,7 @@ export const {
 
 export default doctorSlice.reducer;
 
-export const fetchDoctorsAction = createAction<{ specialtyId?: number; search?: string }>(
+export const fetchDoctorsAction = createAction<{ specialtyId?: number; search?: string; page?: number; pageSize?: number }>(
   `${SLICE_NAME}/fetchDoctorsRequest`
 );
 
@@ -103,12 +106,16 @@ export const deleteDoctorAction = createAction<{ id: number }>(
 function* handleFetchDoctors(): Generator<any, void, any> {
   while (true) {
     const {
-      payload: { specialtyId, search },
+      payload: { specialtyId, search, page, pageSize },
     }: ReturnType<typeof fetchDoctorsAction> = yield take(fetchDoctorsAction);
     try {
       yield put(updatePending());
-      const doctors = yield call(getAllDoctors, specialtyId, search);
-      yield put(fetchDoctorsSuccess(doctors));
+      const result = yield call(getAllDoctors, specialtyId, search, page, pageSize);
+      if (Array.isArray(result)) {
+        yield put(fetchDoctorsSuccess({ doctors: result, pagination: null }));
+      } else {
+        yield put(fetchDoctorsSuccess({ doctors: result.data, pagination: result.pagination }));
+      }
     } catch (e: any) {
       yield put(fetchDoctorsFailure());
       throw e;
